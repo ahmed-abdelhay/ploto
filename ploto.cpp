@@ -100,6 +100,7 @@ struct Expression {
   };
 
   std::vector<Node> nodes;
+  size_t rootNodeId = 0;
 
   double Evaluate(int32_t nodeId, double x) const {
     const Node &node = nodes[nodeId];
@@ -153,7 +154,7 @@ struct Expression {
   }
   double Evaluate(double x) const {
     assert(!nodes.empty());
-    return Evaluate(0, x);
+    return Evaluate(rootNodeId, x);
   }
 };
 
@@ -345,6 +346,7 @@ static bool ParseE(Tokens &tokens, Expression &result) {
     }
     node.children[1] = result.nodes.size();
     RETURN_IF_FALSE(ParseP(tokens, result));
+    result.rootNodeId = result.nodes.size();
     result.nodes.push_back(node);
   }
   return true;
