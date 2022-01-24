@@ -505,8 +505,8 @@ static void SampleFunction(const Function &f, std::vector<float> &x,
 
 struct State {
   struct GuiState {
-    bool error = false;
     std::string errorLog;
+    float range[3] = {-500, 500, 0.1};
     Function function;
   };
 
@@ -534,62 +534,10 @@ struct State {
     const ImVec2 minPoint = ImGui::GetWindowContentRegionMin();
     const ImVec2 maxPoint = ImGui::GetWindowContentRegionMax();
     const float height = (maxPoint.y - minPoint.y);
+    const float width = (maxPoint.x - minPoint.x);
 
-    ImGui::BeginChild("Plot view", ImVec2(-1, height * 0.8));
-    if (ImPlot::BeginPlot("Plot", ImVec2(-1, height * 0.8))) {
-      if (redraw) {
-        plots.clear();
-        for (const Function &f : functions) {
-          PlotState p;
-          SampleFunction(f, p.x, p.y);
-          plots.push_back(p);
-        }
-        redraw = false;
-      }
-      assert(functions.size() == plots.size());
-      for (size_t i = 0; i < plots.size(); i++) {
-        if (functions[i].visible) {
-          const ImVec4 color(functions[i].color.r / 255.0f,
-                             functions[i].color.g / 255.0f,
-                             functions[i].color.b / 255.0f, 1);
-          ImPlot::PushStyleColor(ImPlotCol_Line, color);
-          ImPlot::PlotLine(functions[i].name, plots[i].x.data(),
-                           plots[i].y.data(), plots[i].x.size());
-          ImPlot::PopStyleColor();
-        }
-      }
-      ImPlot::EndPlot();
-    }
-    ImGui::EndChild();
-    ImGui::BeginChild("Controls", ImVec2(-1, height * 0.2));
     {
-      ImGui::Text("Function:");
-      ImGui::SameLine();
-      ImGui::InputText("##", gui.function.name, MAX_EXPRESSION_SIZE);
-      ImGui::Text("X min:");
-      ImGui::SameLine();
-      ImGui::DragInt("##0", &gui.function.bounds[0], 1, -1000, 1000);
-      ImGui::Text("X max:");
-      ImGui::SameLine();
-      ImGui::DragInt("##1", &gui.function.bounds[1], 1, -1000, 1000);
-      ImGui::Text("Sampling distance:");
-      ImGui::SameLine();
-      ImGui::DragFloat("##2", &gui.function.sampleDistance, 1, 0, 10);
-      if (ImGui::Button("Plot")) {
-        if (GenerateExpression(gui.function.name, gui.function.expr,
-                               gui.errorLog)) {
-          functions.push_back(gui.function);
-          redraw = true;
-          gui = {};
-        } else {
-          gui.error = true;
-        }
-      }
-
-      if (gui.error) {
-        ImGui::TextColored(RED, gui.errorLog.c_str());
-      }
-
+      ImGui::BeginChild("Functions list", ImVec2(width * 0.3, height * 0.9));
       ImGui::TextColored(BLUE, "Functions");
       for (Function &function : functions) {
         ImGui::Spacing();
@@ -610,9 +558,64 @@ struct State {
         }
         ImGui::PopID();
       }
+      ImGui::Text("Application average: %.1f FPS", ImGui::GetIO().Framerate);
+      ImGui::EndChild();
     }
-    ImGui::Text("Application average: %.1f FPS", ImGui::GetIO().Framerate);
-    ImGui::EndChild();
+    ImGui::SameLine();
+    {
+      ImGui::BeginChild("Plot view", ImVec2(-1, height * 0.9));
+      if (ImPlot::BeginPlot("Plot", ImVec2(-1, height * 0.9))) {
+        if (redraw) {
+          plots.clear();
+          for (const Function &f : functions) {
+            PlotState p;
+            SampleFunction(f, p.x, p.y);
+            plots.push_back(p);
+          }
+          redraw = false;
+        }
+        assert(functions.size() == plots.size());
+        for (size_t i = 0; i < plots.size(); i++) {
+          if (functions[i].visible) {
+            const ImVec4 color(functions[i].color.r / 255.0f,
+                               functions[i].color.g / 255.0f,
+                               functions[i].color.b / 255.0f, 1);
+            ImPlot::PushStyleColor(ImPlotCol_Line, color);
+            ImPlot::PlotLine(functions[i].name, plots[i].x.data(),
+                             plots[i].y.data(), plots[i].x.size());
+            ImPlot::PopStyleColor();
+          }
+        }
+        ImPlot::EndPlot();
+      }
+      ImGui::EndChild();
+    }
+    {
+      ImGui::BeginChild("Controls", ImVec2(-1, -1));
+      ImGui::Text("Function:");
+      ImGui::SameLine();
+      ImGui::InputText("##", gui.function.name, MAX_EXPRESSION_SIZE);
+      ImGui::SameLine();
+      if (ImGui::Button("Plot")) {
+        if (GenerateExpression(gui.function.name, gui.function.expr,
+                               gui.errorLog)) {
+          gui.function.bounds[0] = gui.range[0];
+          gui.function.bounds[1] = gui.range[1];
+          gui.function.sampleDistance = gui.range[2];
+          functions.push_back(gui.function);
+          redraw = true;
+          gui = {};
+        }
+      }
+      ImGui::Text("Range (min, max, spacing):");
+      ImGui::SameLine();
+      ImGui::InputFloat3("##0", gui.range);
+
+      if (gui.errorLog.size()) {
+        ImGui::TextColored(RED, gui.errorLog.c_str());
+      }
+      ImGui::EndChild();
+    }
     ImGui::End();
   }
 };
